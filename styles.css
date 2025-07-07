@@ -150,7 +150,7 @@ body {
 
 .diff-table {
     width: 100%;
-    white-space: nowrap;
+    
 }
 
 
@@ -809,6 +809,22 @@ body {
     display: none;
 }
 
+
+.diff-item td {
+    white-space: normal;
+    word-break: break-word;
+    max-width: 800px;
+}
+.diff-table code {
+    font-family: 'Fira Code', monospace;
+    font-size: 0.85rem;
+    background: #f3f4f6;
+    padding: 0.25rem 0.5rem;
+    display: block;
+    white-space: pre-wrap;
+    border-radius: var(--radius-sm);
+    overflow-x: auto;
+}
 
 
 .diff-table {
