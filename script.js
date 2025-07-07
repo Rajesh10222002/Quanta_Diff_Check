@@ -140,27 +140,36 @@ class SchemaComparator {
     }
 
     parseXML(xmlString) {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(xmlString, 'text/xml');
-        const result = { tables: [], columns: [], joins: [] };
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xmlString, 'text/xml');
+    const result = { tables: [], columns: [], joins: [] };
 
-        const tables = doc.querySelectorAll('tables table');
-        tables.forEach(table => {
-            const tableData = { name: table.getAttribute('name') };
-            Array.from(table.attributes).forEach(attr => tableData[attr.name] = attr.value);
-            result.tables.push(tableData);
+    const tables = doc.querySelectorAll('tables table');
+    tables.forEach(table => {
+        const tableData = { name: table.getAttribute('name') };
+        Array.from(table.attributes).forEach(attr => tableData[attr.name] = attr.value);
+        
+        // Extract filter information
+        const filter = table.querySelector('filter cond');
+        if (filter) {
+            tableData.filter_formula = filter.getAttribute('formula') || '';
+            tableData.filter_op = filter.getAttribute('op') || '';
+        }
 
-            const columns = table.querySelectorAll('column');
-            columns.forEach(column => {
-                const columnData = {
-                    table: table.getAttribute('name'),
-                    name: column.getAttribute('name')
-                };
-                Array.from(column.attributes).forEach(attr => columnData[attr.name] = attr.value);
-                if (column.getAttribute('formula')) columnData.type = 'formula';
-                result.columns.push(columnData);
-            });
+        
+        result.tables.push(tableData);
+
+        const columns = table.querySelectorAll('column');
+        columns.forEach(column => {
+            const columnData = {
+                table: table.getAttribute('name'),
+                name: column.getAttribute('name')
+            };
+            Array.from(column.attributes).forEach(attr => columnData[attr.name] = attr.value);
+            if (column.getAttribute('formula')) columnData.type = 'formula';
+            result.columns.push(columnData);
         });
+    });
 
         const joins = doc.querySelectorAll('joins join');
         joins.forEach(join => {
@@ -253,19 +262,21 @@ class SchemaComparator {
     }
 
     deepEqual(a, b) {
-        if (a === b) return true;
-        if (typeof a !== 'object' || typeof b !== 'object' || !a || !b) {
-            return this.normalizeValue(a) === this.normalizeValue(b);
-        }
-
-        const allKeys = new Set([...Object.keys(a), ...Object.keys(b)]);
-        for (const key of allKeys) {
-            if ((a?.parent && a?.child && b?.parent && b?.child) && ['join_name', 'name'].includes(key)) continue;
-            if (!this.deepEqual(a[key], b[key])) return false;
-        }
-        return true;
+    if (a === b) return true;
+    if (typeof a !== 'object' || typeof b !== 'object' || !a || !b) {
+        return this.normalizeValue(a) === this.normalizeValue(b);
     }
 
+    // Special handling for filter objects
+
+
+    const allKeys = new Set([...Object.keys(a), ...Object.keys(b)]);
+    for (const key of allKeys) {
+        if ((a?.parent && a?.child && b?.parent && b?.child) && ['join_name', 'name'].includes(key)) continue;
+        if (!this.deepEqual(a[key], b[key])) return false;
+    }
+    return true;
+}
     getPropertyChanges(oldObj, newObj) {
         const allKeys = new Set([...Object.keys(oldObj), ...Object.keys(newObj)]);
         return Array.from(allKeys).map(key => {
@@ -393,60 +404,90 @@ class SchemaComparator {
 
     }
 
-    renderDiffTable(items, type) {
-        if (type === 'changed') return this.renderChangedTable(items);
+   renderDiffTable(items, type) {
+    if (type === 'changed') return this.renderChangedTable(items);
 
-        const keys = this.getObjectKeys(items[0]);
+    const keys = this.getObjectKeys(items[0]);
+    return `
+        <table class="diff-table">
+            <thead><tr>${keys.map(k => `<th>${this.formatHeader(k)}</th>`).join('')}</tr></thead>
+            <tbody>
+                ${items.map(item => `
+                    <tr class="diff-item ${type}">
+                        ${keys.map(k => {
+                            if (k === 'filter' && item[k]) {
+                                return `<td>
+                                    <strong>Formula:</strong> ${this.formatValue(item[k].formula)}<br>
+                                    <strong>Operation:</strong> ${this.formatValue(item[k].op)}
+                                </td>`;
+                            }
+                            return `<td>${this.formatValue(item[k])}</td>`;
+                        }).join('')}
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
+renderChangedTable(items) {
+    if (!items || items.length === 0) return '<div class="no-changes">No changes found</div>';
+
+    const isColumnChange = items[0]?.old?.table && items[0]?.old?.name;
+    const isTableChange = items[0]?.old?.name && !isColumnChange;
+
+    // Render for tables: table + property + old + new
+    if (isTableChange) {
         return `
-            <table class="diff-table">
-                <thead><tr>${keys.map(k => `<th>${this.formatHeader(k)}</th>`).join('')}</tr></thead>
-                <tbody>
-                    ${items.map(item => `
-                        <tr class="diff-item ${type}">
-                            ${keys.map(k => `<td>${this.formatValue(item[k])}</td>`).join('')}
+        <table class="diff-table">
+            <thead>
+                <tr>
+                    <th>Table</th>
+                    <th>Property</th>
+                    <th>Old Value</th>
+                    <th>New Value</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${items.map(item => {
+                    const tableName = item.old?.name || item.new?.name || '-';
+                    const changes = this.getPropertyChanges(item.old, item.new);
+                    
+                    // Handle filter changes specially
+                    const filterChanges = [];
+                   
+                        if (!this.deepEqual(item.old?.filter, item.new?.filter)) {
+                            if (item.old?.filter?.formula !== item.new?.filter?.formula) {
+                                filterChanges.push({
+                                    key: 'filter.formula',
+                                    oldValue: item.old?.filter?.formula,
+                                    newValue: item.new?.filter?.formula
+                                });
+                            }
+                            if (item.old?.filter?.op !== item.new?.filter?.op) {
+                                filterChanges.push({
+                                    key: 'filter.op',
+                                    oldValue: item.old?.filter?.op,
+                                    newValue: item.new?.filter?.op
+                                });
+                            }
+                        }
+                    
+                    
+                    return [...changes, ...filterChanges].map(change => `
+                        <tr class="diff-item changed">
+                            <td>${tableName}</td>
+                            <td>${this.formatHeader(change.key)}</td>
+                            <td>${this.formatValue(change.oldValue)}</td>
+                            <td>${this.formatValue(change.newValue)}</td>
                         </tr>
-                    `).join('')}
-                </tbody>
-            </table>
+                    `).join('');
+                }).join('')}
+            </tbody>
+        </table>
         `;
     }
 
-    renderChangedTable(items) {
-        if (!items || items.length === 0) return '<div class="no-changes">No changes found</div>';
-
-        const isColumnChange = items[0]?.old?.table && items[0]?.old?.name;
-
-        // Render for columns: table + column + property + old + new
-        if (isColumnChange) {
-            return `
-            <table class="diff-table">
-                <thead>
-                    <tr>
-                        <th>Table</th>
-                        <th>Column</th>
-                        <th>Property</th>
-                        <th>Old Value</th>
-                        <th>New Value</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${items.map(item => {
-                const tableName = item.old?.table || item.new?.table || '-';
-                const columnName = item.old?.name || item.new?.name || '-';
-                return this.getPropertyChanges(item.old, item.new).map(change => `
-                            <tr class="diff-item changed">
-                                <td>${tableName}</td>
-                                <td>${columnName}</td>
-                                <td>${this.formatHeader(change.key)}</td>
-                                <td>${this.formatValue(change.oldValue)}</td>
-                                <td>${this.formatValue(change.newValue)}</td>
-                            </tr>
-                        `).join('');
-            }).join('')}
-                </tbody>
-            </table>
-        `;
-        }
 
         // Render for tables: table + property + old + new
         return `
