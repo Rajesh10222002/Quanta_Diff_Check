@@ -335,11 +335,6 @@ body {
 
 
 
-
-
-
-
-
 .diff-content.expanded {
     max-height: none;
     /* removes clipping so scroll is easier */
@@ -347,10 +342,6 @@ body {
     /* allow full scroll */
 }
 
-.diff-table {
-    width: 100%;
-
-}
 
 
 
@@ -994,19 +985,15 @@ body {
 }
 
 .table-container {
-    overflow-x: scroll;
     scrollbar-width: none;
     /* Firefox */
     -ms-overflow-style: none;
     /* Internet Explorer 10+ */
     position: relative;
-    width: 100%;
+
 }
 
-/* Chrome, Safari, Edge */
-.table-container::-webkit-scrollbar {
-    display: none;
-}
+
 
 
 .diff-item td {

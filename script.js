@@ -7,12 +7,12 @@ let progress = 0;
 const progressInterval = setInterval(() => {
     progress += 1;
     progressBar.style.width = `${progress}%`;
-    
+
     // Add some randomness to make it feel more natural
     if (Math.random() > 0.7) {
         progress += Math.random() * 3;
     }
-    
+
     if (progress >= 100) {
         clearInterval(progressInterval);
     }
@@ -21,7 +21,7 @@ const progressInterval = setInterval(() => {
 // Hide loader after 4.5 seconds (can adjust this timing)
 setTimeout(() => {
     initialLoader.classList.add('hidden');
-    
+
     // Remove from DOM after animation completes
     setTimeout(() => {
         initialLoader.remove();
@@ -689,32 +689,33 @@ class SchemaComparator {
         });
 
         container.querySelectorAll('.diff-section').forEach(section => {
-            const scrollbar = section.querySelector('.diff-scrollbar');
-            const tableContainer = section.querySelector('.table-container');
+    const scrollbar = section.querySelector('.diff-scrollbar');
+    const tableContainer = section.querySelector('.table-container');
 
-            if (scrollbar && tableContainer) {
-                const table = tableContainer.querySelector('table');
-                if (!table) return;
+    if (scrollbar && tableContainer) {
+        const table = tableContainer.querySelector('table');
+        if (!table) return;
 
-                // Create a fake scroller that matches the width of the table
-                const scroller = document.createElement('div');
-                scroller.style.width = `${table.scrollWidth}px`;
-                scroller.style.height = '1px';
-                scrollbar.innerHTML = '';
-                scrollbar.appendChild(scroller);
+        // Create a fake scroller that matches the width of the table
+        const scroller = document.createElement('div');
+        scroller.style.width = `${table.scrollWidth}px`;
+        scroller.style.height = '1px';
+        scrollbar.innerHTML = '';
+        scrollbar.appendChild(scroller);
 
-                // Sync scroll positions
-                scrollbar.scrollLeft = tableContainer.scrollLeft;
+        // Sync scroll positions
+        scrollbar.scrollLeft = tableContainer.scrollLeft;
 
-                scrollbar.addEventListener('scroll', () => {
-                    tableContainer.scrollLeft = scrollbar.scrollLeft;
-                });
-
-                tableContainer.addEventListener('scroll', () => {
-                    scrollbar.scrollLeft = tableContainer.scrollLeft;
-                });
-            }
+        scrollbar.addEventListener('scroll', () => {
+            tableContainer.scrollLeft = scrollbar.scrollLeft;
         });
+
+        tableContainer.addEventListener('scroll', () => {
+            scrollbar.scrollLeft = tableContainer.scrollLeft;
+        });
+    }
+});
+
 
         // Add this at the end of renderTabContent:
         container.querySelectorAll('.diff-search').forEach(input => {
@@ -913,6 +914,38 @@ ${allKeys.map(k =>
             </table>
         `;
         }
+
+        if (isColumnChange) {
+    return `
+        <table class="diff-table">
+            <thead>
+                <tr>
+                    <th class="sortable" data-key="table">Table <span class="sort-icon">⇅</span></th>
+                    <th class="sortable" data-key="column">Column <span class="sort-icon">⇅</span></th>
+                    <th class="sortable" data-key="property">Property <span class="sort-icon">⇅</span></th>
+                    <th class="sortable" data-key="oldValue">Old Value <span class="sort-icon">⇅</span></th>
+                    <th class="sortable" data-key="newValue">New Value <span class="sort-icon">⇅</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                ${items.map(item => {
+                    const tableName = item.old?.table || item.new?.table || '-';
+                    const columnName = item.old?.name || item.new?.name || '-';
+                    return this.getPropertyChanges(item.old, item.new).map(change => `
+                        <tr class="diff-item changed">
+                            <td>${tableName}</td>
+                            <td>${columnName}</td>
+                            <td>${this.formatHeader(change.key)}</td>
+                            <td>${this.formatValue(change.oldValue)}</td>
+                            <td>${this.formatValue(change.newValue)}</td>
+                        </tr>
+                    `).join('');
+                }).join('')}
+            </tbody>
+        </table>
+    `;
+}
+
 
         // Render for tables: table + property + old + new
         return `
